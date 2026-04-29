@@ -69,6 +69,23 @@ class TopStartupRead(BaseModel):
     score: float = Field(..., ge=0.0, le=100.0, description="Normalized rank score (0–100)")
     ranking_reason: str = Field(..., max_length=320)
     created_at: datetime
+    sector: str = ""
+    stage: str = ""
+    insight: str = Field(
+        ...,
+        max_length=200,
+        description="One-line narrative summary for card UI",
+    )
+    why_it_matters: str = Field(
+        ...,
+        max_length=400,
+        description="Portfolio-level priority framing",
+    )
+    vc_digest: str = Field(
+        ...,
+        max_length=900,
+        description="Formatted diligence lines: name, sector, stage, qualifies, 1–10 score",
+    )
 
 
 class MemoBase(BaseModel):

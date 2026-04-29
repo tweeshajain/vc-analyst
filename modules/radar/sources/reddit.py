@@ -11,6 +11,7 @@ from typing import Any
 
 import httpx
 
+from modules.radar.company_filter import reddit_post_is_company_candidate
 from modules.radar.types import TrendingStartup
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,9 @@ def _post_to_trending(
     url = link if link and "reddit.com" not in link else full_reddit
     url = url[:2048]
     external_id = f"reddit_{subreddit}_{pid}"
+    domain_field = (d.get("domain") or "").strip().lower()
+    if not reddit_post_is_company_candidate(title, domain_field, url):
+        return None
     return TrendingStartup(
         name=title[:255],
         description=desc or title[:500],

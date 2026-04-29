@@ -12,6 +12,7 @@ from backend.app.schemas import (
     TrendsRead,
     TrendThemeRead,
 )
+from modules.radar.company_filter import startup_is_company_candidate
 from modules.radar.ranking import build_top_startups_read
 from modules.radar.scoring import compute_radar_score
 from modules.radar.trends import build_trends
@@ -30,7 +31,7 @@ def list_startups(db: Session = Depends(get_db)):
         .order_by(Startup.created_at.desc())
         .all()
     )
-    return rows
+    return [s for s in rows if startup_is_company_candidate(s.source or "", s.name or "", s.url)]
 
 
 @router.get("/top-startups", response_model=list[TopStartupRead])
@@ -40,6 +41,7 @@ def top_startups(db: Session = Depends(get_db)):
     and min–max normalization across that leaderboard slice.
     """
     rows = db.query(Startup).limit(_TOP_STARTUPS_POOL).all()
+    rows = [s for s in rows if startup_is_company_candidate(s.source or "", s.name or "", s.url)]
     return build_top_startups_read(rows, limit=10, candidate_cap=_TOP_STARTUPS_POOL)
 
 
@@ -47,6 +49,7 @@ def top_startups(db: Session = Depends(get_db)):
 def trends(db: Session = Depends(get_db)):
     """Cross-startup keyword themes for market pulse (demo narrative layer)."""
     rows = db.query(Startup).limit(_TRENDS_POOL).all()
+    rows = [s for s in rows if startup_is_company_candidate(s.source or "", s.name or "", s.url)]
     theme_rows, headline, n = build_trends(rows)
     return TrendsRead(
         startup_pool_size=n,

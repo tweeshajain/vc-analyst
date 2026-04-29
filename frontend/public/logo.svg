@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="ava-bg" x1="10" y1="6" x2="38" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A5B4FC"/>
+      <stop offset="0.4" stop-color="#818CF8"/>
+      <stop offset="1" stop-color="#4F46E5"/>
+    </linearGradient>
+    <linearGradient id="ava-dot" x1="34" y1="14" x2="42" y2="6" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6EE7B7"/>
+      <stop offset="1" stop-color="#34D399"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="13" fill="url(#ava-bg)"/>
+  <path
+    d="M8 36c10-14 22-18 32-22"
+    stroke="rgba(255,255,255,0.25)"
+    stroke-width="2"
+    stroke-linecap="round"
+  />
+  <rect x="11" y="21" width="7.5" height="15" rx="2.5" fill="white" fill-opacity="0.95"/>
+  <rect x="20.25" y="15" width="7.5" height="21" rx="2.5" fill="white" fill-opacity="0.95"/>
+  <rect x="29.5" y="9" width="7.5" height="27" rx="2.5" fill="white" fill-opacity="0.95"/>
+  <circle cx="39" cy="10" r="4" fill="url(#ava-dot)"/>
+</svg>

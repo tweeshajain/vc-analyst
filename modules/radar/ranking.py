@@ -8,12 +8,116 @@ from urllib.parse import urlparse
 
 from backend.app.models import Startup
 from backend.app.schemas import TopStartupRead
+from modules.radar.company_filter import startup_is_company_candidate
 from modules.radar.scoring import (
     RankingBreakdown,
     compute_ranking_breakdown,
     build_short_ranking_reason,
     min_max_normalize_0_100,
 )
+
+
+def _sector_label(raw: str) -> str:
+    s = (raw or "").strip()
+    return s if s else "General"
+
+
+def _stage_label(raw: str) -> str:
+    s = (raw or "").strip()
+    return s if s else "Unspecified"
+
+
+def build_radar_insight_line(b: RankingBreakdown, sector_guess: str) -> str:
+    """
+    Single-line, analyst-style takeaway derived from signals (template-based “AI” voice).
+    """
+    sector = _sector_label(sector_guess)
+    if b.engagement >= 120 or b.raw_score >= 200:
+        tier_desc = "Outsized community pull"
+    elif b.engagement >= 40:
+        tier_desc = "Solid engagement momentum"
+    else:
+        tier_desc = "Early visibility"
+
+    if b.matched_keywords:
+        lead = b.matched_keywords[0]
+        rest = len(b.matched_keywords) - 1
+        tail = f" (+{rest} related signals)" if rest else ""
+        line = (
+            f"{tier_desc} with {lead} narrative fit{tail} — "
+            f"{sector} positioning is resonating in-channel."
+        )
+    else:
+        line = (
+            f"{tier_desc}; pure traction read in-feed — {sector} angle merits "
+            f"a fast screen before the narrative crowds."
+        )
+    return line[:198]
+
+
+def norm_score_to_vc_relevance_10(norm: float) -> int:
+    """Map 0–100 normalized leaderboard score to VC relevance 1–10."""
+    n = int(round(float(norm) / 100.0 * 9)) + 1
+    return max(1, min(10, n))
+
+
+def build_why_qualifies_short(insight: str, ranking_reason: str, max_chars: int = 260) -> str:
+    """Single block for digest; trimmed to ~2 lines."""
+    parts = [p.strip() for p in (insight, ranking_reason) if (p or "").strip()]
+    text = " ".join(parts)
+    if len(text) <= max_chars:
+        return text
+    cut = text[: max_chars - 1]
+    if " " in cut:
+        cut = cut.rsplit(" ", 1)[0]
+    return cut + "…"
+
+
+def build_vc_digest(
+    name: str,
+    sector: str,
+    stage: str,
+    qualifies: str,
+    relevance_1_10: int,
+) -> str:
+    """Strict five-field output for UI / export."""
+    sec = _sector_label(sector)
+    stg = _stage_label(stage)
+    return (
+        f"Company Name: {name}\n"
+        f"Sector: {sec}\n"
+        f"Stage: {stg}\n"
+        f"Why it qualifies (1–2 lines max): {qualifies}\n"
+        f"VC relevance score (1–10): {relevance_1_10}"
+    )
+
+
+def build_radar_why_it_matters(
+    name: str,
+    normalized_score: float,
+    sector_raw: str,
+    stage_raw: str,
+    matched: tuple[str, ...],
+) -> str:
+    """Why this name deserves bandwidth vs the rest of the funnel this week."""
+    sector = _sector_label(sector_raw)
+    stage = _stage_label(stage_raw)
+    nm = (name or "This company").strip()[:48]
+    if normalized_score >= 75:
+        pri = f"{nm} sits in the top decile of this radar slice—allocate partner time for a crisp next step."
+    elif normalized_score >= 45:
+        pri = f"{nm} is squarely in the active queue: enough signal to justify outreach while expectations stay disciplined."
+    else:
+        pri = f"{nm} is a watchlist name—track for theme intelligence even if near-term priority is lower."
+
+    kw_bit = (
+        f" Keyword alignment ({', '.join(matched[:3])}) maps to live thesis tags."
+        if matched
+        else " Lead with velocity proof points—the profile is still proving category drag."
+    )
+    stage_bit = f" Label reads as {stage}; validate {sector} wedge depth on the first call."
+    out = f"{pri} {stage_bit}{kw_bit}"
+    return out[:398]
 
 
 _REDDIT_HOSTS = frozenset(
@@ -83,6 +187,11 @@ def build_top_startups_read(
     normalize scores to 0–100 across that top slice only.
     """
     rows = startups[:candidate_cap] if len(startups) > candidate_cap else startups
+    rows = [
+        s
+        for s in rows
+        if startup_is_company_candidate(s.source or "", s.name or "", s.url)
+    ]
     enriched = [_enrich(s) for s in rows]
     deduped = dedupe_by_best_raw(enriched)
     deduped.sort(key=lambda e: e.breakdown.raw_score, reverse=True)
@@ -95,6 +204,23 @@ def build_top_startups_read(
         row = e.row
         b = e.breakdown
         reason = build_short_ranking_reason(b, norm)
+        insight = build_radar_insight_line(b, row.sector or "")
+        why = build_radar_why_it_matters(
+            row.name,
+            float(norm),
+            row.sector or "",
+            row.stage or "",
+            b.matched_keywords,
+        )
+        rel10 = norm_score_to_vc_relevance_10(float(norm))
+        qualifies = build_why_qualifies_short(insight, reason)
+        digest = build_vc_digest(
+            row.name or "",
+            row.sector or "",
+            row.stage or "",
+            qualifies,
+            rel10,
+        )
         out.append(
             TopStartupRead(
                 id=row.id,
@@ -108,6 +234,11 @@ def build_top_startups_read(
                 score=round(float(norm), 4),
                 ranking_reason=reason,
                 created_at=row.created_at,
+                sector=row.sector or "",
+                stage=row.stage or "",
+                insight=insight,
+                why_it_matters=why,
+                vc_digest=digest[:900],
             )
         )
     return out

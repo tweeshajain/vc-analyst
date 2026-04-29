@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from backend.app.database import get_db
 from backend.app.models import Deal, Startup
 from backend.app.schemas import DealCreate, DealRead, TopDealRead
+from modules.radar.company_filter import startup_is_company_candidate
 from modules.deals.deal_scoring import (
     filter_startups_for_top_deals,
     parse_industry_query,
@@ -39,6 +40,9 @@ def deals_top(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
     startups = db.query(Startup).limit(_TOP_STARTUP_POOL).all()
+    startups = [
+        s for s in startups if startup_is_company_candidate(s.source or "", s.name or "", s.url)
+    ]
     startups = filter_startups_for_top_deals(startups, ind, stg)
     ranked = rank_investment_worthy(startups, limit=5)
     return [

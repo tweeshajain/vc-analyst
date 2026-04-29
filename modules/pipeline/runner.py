@@ -22,6 +22,7 @@ from backend.app.models import InvestmentMemo, PipelineRun, Startup, TopStartups
 from modules.deals.deal_scoring import rank_investment_worthy
 from modules.memo.generator import generate_memo
 from modules.radar.aggregator import fetch_all_trending
+from modules.radar.company_filter import startup_is_company_candidate
 from modules.radar.persistence import persist_trending_batch
 from modules.radar.ranking import build_top_startups_read
 from modules.radar.scoring import compute_radar_score
@@ -217,6 +218,7 @@ def run_daily_pipeline(
         # 4 — Deal ranking snapshot
         log.info("Step 4/5: deal ranking snapshot")
         pool = db.query(Startup).limit(600).all()
+        pool = [s for s in pool if startup_is_company_candidate(s.source or "", s.name or "", s.url)]
         ranked = rank_investment_worthy(pool, limit=5)
         stats["top_deals"] = [
             {
